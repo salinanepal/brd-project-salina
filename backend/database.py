@@ -108,10 +108,13 @@ def get_goal_summary(goal_id: int):
                 g.target_amount,
                 COALESCE(SUM(c.amount), 0)                AS total_raised,
                 COUNT(c.id)                               AS contribution_count,
-                ROUND(
-                    COALESCE(SUM(c.amount), 0)
-                    / g.target_amount * 100
-                , 2)                                      AS percent_complete
+               ROUND(
+                    CASE
+                        WHEN g.target_amount > 0
+                        THEN COALESCE(SUM(c.amount), 0) / g.target_amount * 100
+                        ELSE 0
+                    END,
+                2) AS percent_complete
             FROM goals g
             LEFT JOIN contributions c ON c.goal_id = g.id
             WHERE g.id = %s
