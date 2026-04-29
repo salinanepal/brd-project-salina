@@ -21,7 +21,7 @@ def create_user(name:str, email:str) -> int:
             (name, email),
         )
         conn.commit()
-        return cur.lastrowid
+        return cur.lastrowid # type: ignore[return-value]
     except Error:
         conn.rollback()
         raise
@@ -176,14 +176,41 @@ def get_goal_summary(goal_id: int):
  
     finally:
         conn.close()
+def delete_user(user_id: int):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
 
-conn = get_connection()
-try:
-    cur = conn.cursor()
-    cur.execute("SHOW TABLES")
-    print(cur.fetchall())
-finally:
-    conn.close()
+        cur.execute(
+            "DELETE FROM users WHERE id=%s",
+            (user_id,)
+        )
 
+        conn.commit()
 
+    except Error:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
+
+def delete_goal(goal_id: int):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+
+        cur.execute(
+            "DELETE FROM goals WHERE id=%s",
+            (goal_id,)
+        )
+
+        conn.commit()
+
+    except Error:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 

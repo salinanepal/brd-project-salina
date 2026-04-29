@@ -1,8 +1,22 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import database as db
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class UserRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -31,6 +45,11 @@ def create_user(user: UserRequest):
         }
     except Exception:
         raise HTTPException(status_code=409, detail="Email already exists.")
+
+@app.delete("/users/{user_id}")
+def remove_user(user_id: int):
+    db.delete_user(user_id)
+    return {"message": "User deleted"}
     
 @app.get("/goals")
 def list_goals():
@@ -55,18 +74,25 @@ def goal_summary(goal_id: int):
  
     return summary
 
+@app.delete("/goals/{goal_id}")
+def remove_goal(goal_id: int):
+    db.delete_goal(goal_id)
+    return {"message": "Goal deleted"}
+
 @app.post("/contributions", status_code=201)
 def add_contribution(contribution: ContributionRequest):
     try:
         db.add_contribution(contribution.user_id, contribution.goal_id, contribution.amount)
         summary = db.get_goal_summary(contribution.goal_id)
         return {
-            "message": f"₨{contribution.amount:,.2f} contribution recorded!",
+            "message": f"${contribution.amount:,.2f} contribution recorded!",
             "summary": summary,
         }
     except Exception as e:
         # 400 = "Bad Request"
         raise HTTPException(status_code=400, detail=str(e))
+
+
  
  
  
