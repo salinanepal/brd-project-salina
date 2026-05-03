@@ -38,22 +38,33 @@ def get_users():
     finally:
         conn.close()
 
-def create_goal(title:str, target_amount:float) ->int:
+def create_goal(title: str, target_amount: float):
     conn = get_connection()
     try:
         cur = conn.cursor()
+
+        clean_title = title.strip()
+
         cur.execute(
-            "INSERT INTO goals (title, target_amount) VALUES (%s, %s)",
-            (title, target_amount),
+            "SELECT id FROM goals WHERE LOWER(TRIM(title)) = LOWER(%s) AND status='active'",
+            (clean_title,)
         )
+
+        existing = cur.fetchone()
+
+        if existing:
+            raise Exception("Goal already exists")
+
+        cur.execute(
+            "INSERT INTO goals (title, target_amount, status) VALUES (%s, %s, 'active')",
+            (clean_title, target_amount)
+        )
+
         conn.commit()
-        return cur.lastrowid  # type: ignore[return-value]
-    except Error:
-        conn.rollback()
-        raise
+        return cur.lastrowid
+
     finally:
         conn.close()
-        
 
 def get_goal(goal_id:int):
     conn = get_connection()
@@ -73,7 +84,17 @@ def get_all_goals() ->list:
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM goals ORDER BY id DESC")
+        cur.execute("""
+            SELECT
+                g.id,
+                g.title,
+                g.target_amount,
+                COALESCE(SUM(c.amount), 0) AS total_raised
+            FROM goals g
+            LEFT JOIN contributions c ON c.goal_id = g.id
+            GROUP BY g.id
+            ORDER BY g.id DESC
+        """)
         rows = cur.fetchall()
         for row in rows:
             r: dict = row  # type: ignore[assignment]

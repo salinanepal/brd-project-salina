@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 import database as db
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,7 +20,7 @@ app.add_middleware(
 
 class UserRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    email: str = Field(..., min_length=3, max_length=150)
+    email: EmailStr = Field(..., min_length=3, max_length=150)
 
 class GoalRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
@@ -58,6 +58,20 @@ def list_goals():
 @app.post("/goals", status_code=201)
 def create_goal(goal: GoalRequest):
     try:
+        print("Incoming goal:", goal.title, goal.target_amount)
+
+        new_id = db.create_goal(goal.title, goal.target_amount)
+
+        return {
+            "id": new_id,
+            "title": goal.title,
+            "target_amount": goal.target_amount
+        }
+
+    except Exception as e:
+        print("CREATE GOAL ERROR:", repr(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
         new_id = db.create_goal(goal.title, goal.target_amount)
         return {"id": new_id, "title": goal.title, "target_amount": goal.target_amount}
     except Exception as e:
@@ -81,17 +95,37 @@ def remove_goal(goal_id: int):
 
 @app.post("/contributions", status_code=201)
 def add_contribution(contribution: ContributionRequest):
-    try:
-        db.add_contribution(contribution.user_id, contribution.goal_id, contribution.amount)
-        summary = db.get_goal_summary(contribution.goal_id)
-        return {
-            "message": f"${contribution.amount:,.2f} contribution recorded!",
-            "summary": summary,
-        }
-    except Exception as e:
-        # 400 = "Bad Request"
-        raise HTTPException(status_code=400, detail=str(e))
+    summary = db.get_goal_summary(contribution.goal_id)
 
+    if not summary:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    target = float(summary["target_amount"])
+    raised = float(summary["total_raised"])
+
+    remaining = target - raised
+
+    if remaining <= 0:
+        raise HTTPException(status_code=400, detail="Goal already completed")
+
+    if contribution.amount > remaining:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {remaining:.2f} left to complete this goal"
+        )
+
+    db.add_contribution(
+        contribution.user_id,
+        contribution.goal_id,
+        contribution.amount
+    )
+
+    updated = db.get_goal_summary(contribution.goal_id)
+
+    return {
+        "message": "Contribution added successfully",
+        "summary": updated
+    }
 
  
  
