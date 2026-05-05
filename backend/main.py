@@ -17,10 +17,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-class UserRequest(BaseModel):
+class LoginRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    email: EmailStr = Field(..., min_length=3, max_length=150)
+    email: EmailStr
+
+# class UserRequest(BaseModel):
+#     name: str = Field(..., min_length=1, max_length=100)
+#     email: EmailStr = Field(..., min_length=3, max_length=150)
 
 class GoalRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
@@ -31,20 +34,41 @@ class ContributionRequest(BaseModel):
     goal_id: int
     amount: float = Field(...,gt=0)
 
+@app.post("/auth/login")
+def login(req: LoginRequest):
+    try:
+        user = db.login_user(req.name, req.email)
+        return {"user": user, "message": f"Welcome back, {user['name']}!"}
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Login failed. Please try again.")
+ 
+ 
+@app.post("/auth/register", status_code=201)
+def register(req: LoginRequest):
+    try:
+        user = db.register_user(req.name, req.email)
+        return {"user": user, "message": f"Welcome, {user['name']}!"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
+    
 @app.get("/users")
 def list_users():
     return db.get_users()
 
-@app.post("/users", status_code=201)
-def create_user(user: UserRequest):
-    try:
-        new_id = db.create_user(user.name, user.email)
-        return {
-            "message": f"{user.name} added to the team!",
-            "user": {"id": new_id, "name": user.name, "email": user.email},
-        }
-    except Exception:
-        raise HTTPException(status_code=409, detail="Email already exists.")
+# @app.post("/users", status_code=201)
+# def create_user(user: UserRequest):
+#     try:
+#         new_id = db.create_user(user.name, user.email)
+#         return {
+#             "message": f"{user.name} added to the team!",
+#             "user": {"id": new_id, "name": user.name, "email": user.email},
+#         }
+#     except Exception:
+#         raise HTTPException(status_code=409, detail="Email already exists.")
 
 @app.delete("/users/{user_id}")
 def remove_user(user_id: int):
@@ -71,11 +95,7 @@ def create_goal(goal: GoalRequest):
     except Exception as e:
         print("CREATE GOAL ERROR:", repr(e))
         raise HTTPException(status_code=400, detail=str(e))
-    try:
-        new_id = db.create_goal(goal.title, goal.target_amount)
-        return {"id": new_id, "title": goal.title, "target_amount": goal.target_amount}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
     
 @app.get("/goals/{goal_id}/summary")
 def goal_summary(goal_id: int):

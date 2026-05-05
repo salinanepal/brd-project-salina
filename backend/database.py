@@ -13,21 +13,67 @@ def get_connection():
         database=os.getenv("DB_NAME"),
         autocommit=False
     )
-def create_user(name:str, email:str) -> int:
+
+def login_user(name: str, email: str) -> dict:
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("INSERT INTO users (name, email) VALUES (%s, %s)",
-            (name, email),
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id, name, email FROM users WHERE email = %s", (email,))
+        existing: dict | None = cur.fetchone()  # type: ignore[assignment]
+ 
+        if not existing:
+            raise ValueError("No account found with this email. Please register first.")
+ 
+        existing_name: str = existing["name"]
+        if existing_name.strip().lower() != name.strip().lower():
+            raise ValueError("Name doesn't match our records for this email.")
+ 
+        return existing
+ 
+    finally:
+        conn.close()
+ 
+ 
+def register_user(name: str, email: str) -> dict:
+    conn = get_connection()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        existing = cur.fetchone()
+ 
+        if existing:
+            raise ValueError("An account with this email already exists. Please sign in instead.")
+ 
+        cur.execute(
+            "INSERT INTO users (name, email) VALUES (%s, %s)",
+            (name.strip(), email.strip())
         )
         conn.commit()
-        return cur.lastrowid # type: ignore[return-value]
+        return {"id": cur.lastrowid, "name": name.strip(), "email": email.strip()}
+ 
+    except ValueError:
+        raise
     except Error:
         conn.rollback()
         raise
-
     finally:
         conn.close()
+
+# def create_user(name:str, email:str) -> int:
+#     conn = get_connection()
+#     try:
+#         cur = conn.cursor()
+#         cur.execute("INSERT INTO users (name, email) VALUES (%s, %s)",
+#             (name, email),
+#         )
+#         conn.commit()
+#         return cur.lastrowid # type: ignore[return-value]
+#     except Error:
+#         conn.rollback()
+#         raise
+
+#     finally:
+#         conn.close()
 
 def get_users():
     conn = get_connection()
@@ -110,6 +156,18 @@ def add_contribution(user_id: int, goal_id: int, amount: float):
         cur.execute("INSERT INTO contributions (user_id, goal_id, amount) VALUES (%s, %s, %s)",
             (user_id, goal_id, amount),  
         )
+
+        cur.execute("""
+            UPDATE goals
+            SET status = 'completed'
+            WHERE id = %s
+            AND (
+                SELECT COALESCE(SUM(amount), 0) 
+                FROM contributions 
+                WHERE goal_id = %s
+            ) >= target_amount
+        """, (goal_id, goal_id))
+
         conn.commit()
         return cur.lastrowid
     except Error:
