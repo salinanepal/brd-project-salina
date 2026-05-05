@@ -1,17 +1,19 @@
 .goals-page {
-  padding: 24px;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 36px 20px 72px;
 }
-
+ 
 .goals-page h1 {
   font-size: 26px;
-  margin-bottom: 6px;
+  font-weight: 600;
+  color: #2c2c2a;
+  margin-bottom: 4px;
 }
-
+ 
 .goals-page h2 {
-  font-size: 18px;
-  color: #94a3b8;
-  margin-bottom: 20px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #888780;
+  margin-bottom: 8px;
 }
