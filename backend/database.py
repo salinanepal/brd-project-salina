@@ -182,11 +182,11 @@ def get_goal_summary(goal_id: int):
         cur = conn.cursor(dictionary=True)
         cur.execute("""
             SELECT
-                g.id                                       AS goal_id,
+                g.id AS goal_id,
                 g.title,
                 g.target_amount,
-                COALESCE(SUM(c.amount), 0)                AS total_raised,
-                COUNT(c.id)                               AS contribution_count,
+                COALESCE(SUM(c.amount), 0) AS total_raised,
+                COUNT(c.id) AS contribution_count,
                ROUND(
                     CASE
                         WHEN g.target_amount > 0
