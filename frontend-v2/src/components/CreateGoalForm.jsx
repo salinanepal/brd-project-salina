@@ -4,19 +4,25 @@ import "./form.css";
 export default function CreateGoalForm({ onCreate }) {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
+  const [error, setError] = useState("")
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!title || !amount) return;
+  e.preventDefault();
+  setError("");
 
-    onCreate({
-      title,
-      target_amount: Number(amount),
-    });
+  if (!title.trim()) {
+    setError("Please enter a goal title.");
+    return;
+  }
+  if (!amount || Number(amount) <= 0) {
+    setError("Please enter a valid target amount.");
+    return;
+  }
 
-    setTitle("");
-    setAmount("");
-  };
+  onCreate({ title: title.trim(), target_amount: Number(amount) });
+  setTitle("");
+  setAmount("");
+};
 
   return (
     <form className="form-card" onSubmit={handleSubmit}>
@@ -39,9 +45,12 @@ export default function CreateGoalForm({ onCreate }) {
         />
       </div>
 
+      {error && <p className="form-error">{error}</p>}
+<div>
       <button className="form-btn" type="submit">
         Create Goal
       </button>
+      </div>
     </form>
   );
 }

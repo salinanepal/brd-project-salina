@@ -1,30 +1,53 @@
 const API = "http://localhost:8000";
-
-// USERS
-export const getUsers = async () => {
-  const res = await fetch(`${API}/users`);
-  return res.json();
-};
-
-export const createUser = async (user) => {
-  const res = await fetch(`${API}/users`, {
+// AUTH
+export const loginUser = async ({ name, email }) => {
+  const res = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(user),
+    body: JSON.stringify({ name, email }),
   });
-
   const result = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(result.detail || "Request failed");
-  }
-
+  if (!res.ok) throw new Error(result.detail || "Login failed");
   return result;
 };
+ 
+export const registerUser = async ({ name, email }) => {
+  const res = await fetch(`${API}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email }),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result.detail || "Registration failed");
+  return result;
+};
+
+// USERS
+// export const getUsers = async () => {
+//   const res = await fetch(`${API}/users`);
+//   return res.json();
+// };
+
+// export const createUser = async (user) => {
+//   const res = await fetch(`${API}/users`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify(user),
+//   });
+
+//   const result = await res.json().catch(() => ({}));
+
+//   if (!res.ok) {
+//     throw new Error(result.detail || "Request failed");
+//   }
+
+//   return result;
+// };
 
 
 
 // GOALS
+
 export const getGoals = async () => {
   const res = await fetch(`${API}/goals`);
   return res.json();
@@ -58,11 +81,11 @@ export const getGoalSummary = async (goalId) => {
   return result;
 };
 
-export const createContribution = async (data) => {
+export const createContribution = async (contribution) => {
   const res = await fetch(`${API}/contributions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify(contribution),
   });
 
   const result = await res.json().catch(() => ({}));

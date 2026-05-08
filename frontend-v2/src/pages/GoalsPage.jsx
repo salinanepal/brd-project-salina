@@ -20,7 +20,7 @@ export default function GoalsPage() {
     if (!user) {
       navigate("/", { replace: true });
     }
-  }, []);
+  }, [user, navigate]);
 
   useEffect(() => {
     async function fetchGoals() {
@@ -90,7 +90,7 @@ export default function GoalsPage() {
         </button>
       </div>
 
-      {/* ERROR MESSAGE (duplicate goal etc.) */}
+      {/* ERROR MESSAGE*/}
       {error && <p className="form-error">{error}</p>}
 
       {/* CREATE GOAL FORM */}

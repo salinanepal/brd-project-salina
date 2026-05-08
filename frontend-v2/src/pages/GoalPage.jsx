@@ -21,7 +21,7 @@ export default function GoalPage() {
     if (!user) {
       navigate("/", { replace: true });
     }
-  }, []);
+  }, [user, navigate]);
 
   useEffect(() => {
     async function fetchGoal() {

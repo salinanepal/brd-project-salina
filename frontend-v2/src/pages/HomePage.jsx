@@ -31,7 +31,7 @@ export default function HomePage() {
   };
 
   const handleUserSelect = (user) => {
-  localStorage.setItem("selectedUser", JSON.stringify(user));
+  sessionStorage.setItem("selectedUser", JSON.stringify(user));
   navigate("/goals");
 };
 
@@ -40,7 +40,8 @@ export default function HomePage() {
 
       <h1>Team Lunch Milestone</h1>
 
-      <h2>Select User</h2>
+      <h2>Pick your profile to start contributing</h2>
+      <div className="card-container">
 
       {users.map((user) => (
         <UserSelectCard
@@ -50,6 +51,7 @@ export default function HomePage() {
           onSelect={() => handleUserSelect(user)}
         />
       ))}
+      </div>
 
       {/* TOGGLE BUTTON */}
       <p style={{ marginTop: "20px", color: "#6b7280" }}>
