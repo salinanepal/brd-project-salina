@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, EmailStr
+from typing import Optional
 import database as db
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,38 +17,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+#MODELS
 class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+
+class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-
-# class UserRequest(BaseModel):
-#     name: str = Field(..., min_length=1, max_length=100)
-#     email: EmailStr = Field(..., min_length=3, max_length=150)
+    password: str = Field(..., min_length=8)
 
 class GoalRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
-    target_amount: float = Field(...,gt=0)
+    target_amount: float = Field(..., gt=0)
+    created_by: int
+    target_date: Optional[str] = None
 
 class ContributionRequest(BaseModel):
     user_id: int
     goal_id: int
-    amount: float = Field(...,gt=0)
+    amount: float = Field(..., gt=0)
+
+#AUTH
 
 @app.post("/auth/login")
 def login(req: LoginRequest):
     try:
-        user = db.login_user(req.name, req.email)
+        user = db.login_user(req.email, req.password)
         return {"user": user, "message": f"Welcome back, {user['name']}!"}
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except Exception:
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
- 
- 
+
 @app.post("/auth/register", status_code=201)
-def register(req: LoginRequest):
+def register(req: RegisterRequest):
     try:
-        user = db.register_user(req.name, req.email)
+        user = db.register_user(req.name, req.email, req.password)
         return {"user": user, "message": f"Welcome, {user['name']}!"}
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -59,22 +65,12 @@ def register(req: LoginRequest):
 def list_users():
     return db.get_users()
 
-# @app.post("/users", status_code=201)
-# def create_user(user: UserRequest):
-#     try:
-#         new_id = db.create_user(user.name, user.email)
-#         return {
-#             "message": f"{user.name} added to the team!",
-#             "user": {"id": new_id, "name": user.name, "email": user.email},
-#         }
-#     except Exception:
-#         raise HTTPException(status_code=409, detail="Email already exists.")
-
 @app.delete("/users/{user_id}")
 def remove_user(user_id: int):
     db.delete_user(user_id)
     return {"message": "User deleted"}
-    
+
+#GOALS
 @app.get("/goals")
 def list_goals():
     return db.get_all_goals()
@@ -82,30 +78,21 @@ def list_goals():
 @app.post("/goals", status_code=201)
 def create_goal(goal: GoalRequest):
     try:
-        print("Incoming goal:", goal.title, goal.target_amount)
-
-        new_id = db.create_goal(goal.title, goal.target_amount)
-
-        return {
-            "id": new_id,
-            "title": goal.title,
-            "target_amount": goal.target_amount
-        }
-
+        new_id = db.create_goal(
+            goal.title,
+            goal.target_amount,
+            goal.created_by,
+            goal.target_date
+        )
+        return {"id": new_id, "title": goal.title, "target_amount": goal.target_amount}
     except Exception as e:
-        print("CREATE GOAL ERROR:", repr(e))
         raise HTTPException(status_code=400, detail=str(e))
 
-    
 @app.get("/goals/{goal_id}/summary")
 def goal_summary(goal_id: int):
-   
     summary = db.get_goal_summary(goal_id)
- 
     if not summary:
-        
         raise HTTPException(status_code=404, detail="Goal not found.")
- 
     return summary
 
 @app.delete("/goals/{goal_id}")
@@ -113,46 +100,25 @@ def remove_goal(goal_id: int):
     db.delete_goal(goal_id)
     return {"message": "Goal deleted"}
 
+#CONTRIBUTIONS
 @app.post("/contributions", status_code=201)
 def add_contribution(contribution: ContributionRequest):
     summary = db.get_goal_summary(contribution.goal_id)
-
     if not summary:
         raise HTTPException(status_code=404, detail="Goal not found")
 
     target = float(summary["target_amount"])
     raised = float(summary["total_raised"])
-
     remaining = target - raised
 
     if remaining <= 0:
         raise HTTPException(status_code=400, detail="Goal already completed")
-
     if contribution.amount > remaining:
         raise HTTPException(
             status_code=400,
-            detail=f"Only {remaining:.2f} left to complete this goal"
+            detail=f"Only Rs {remaining:.2f} left to complete this goal"
         )
 
-    db.add_contribution(
-        contribution.user_id,
-        contribution.goal_id,
-        contribution.amount
-    )
-
+    db.add_contribution(contribution.user_id, contribution.goal_id, contribution.amount)
     updated = db.get_goal_summary(contribution.goal_id)
-
-    return {
-        "message": "Contribution added successfully",
-        "summary": updated
-    }
-
- 
- 
- 
-
-
-
-
-
-
+    return {"message": "Contribution added successfully", "summary": updated}
