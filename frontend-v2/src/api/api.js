@@ -1,50 +1,35 @@
 const API = "http://localhost:8000";
-// AUTH
-export const loginUser = async ({ name, email }) => {
+
+//AUTH 
+
+export const loginUser = async ({ email, password }) => {
   const res = await fetch(`${API}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email }),
+    body: JSON.stringify({ email, password }),
   });
   const result = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(result.detail || "Login failed");
   return result;
 };
- 
-export const registerUser = async ({ name, email }) => {
+
+export const registerUser = async ({ name, email, password }) => {
   const res = await fetch(`${API}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email }),
+    body: JSON.stringify({ name, email, password }),
   });
   const result = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(result.detail || "Registration failed");
   return result;
 };
 
-// USERS
-// export const getUsers = async () => {
-//   const res = await fetch(`${API}/users`);
-//   return res.json();
-// };
+//USERS
 
-// export const createUser = async (user) => {
-//   const res = await fetch(`${API}/users`, {
-//     method: "POST",
-//     headers: { "Content-Type": "application/json" },
-//     body: JSON.stringify(user),
-//   });
-
-//   const result = await res.json().catch(() => ({}));
-
-//   if (!res.ok) {
-//     throw new Error(result.detail || "Request failed");
-//   }
-
-//   return result;
-// };
-
-
+export const getUsers = async () => {
+  const res = await fetch(`${API}/users`);
+  return res.json();
+};
 
 // GOALS
 
@@ -59,27 +44,21 @@ export const createGoal = async (goal) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(goal),
   });
-
   if (!res.ok) {
-    const errData = await res.json();
-    throw new Error(errData.detail || errData.message || "Failed to create goal");
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || "Failed to create goal");
   }
-
   return res.json();
 };
 
-
 export const getGoalSummary = async (goalId) => {
   const res = await fetch(`${API}/goals/${goalId}/summary`);
-
   const result = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(result.detail || "Failed to load goal");
-  }
-
+  if (!res.ok) throw new Error(result.detail || "Failed to load goal");
   return result;
 };
+
+//CONTRIBUTIONS
 
 export const createContribution = async (contribution) => {
   const res = await fetch(`${API}/contributions`, {
@@ -87,12 +66,7 @@ export const createContribution = async (contribution) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(contribution),
   });
-
   const result = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(result.detail || "Failed to create contribution");
-  }
-
+  if (!res.ok) throw new Error(result.detail || "Failed to create contribution");
   return result;
 };

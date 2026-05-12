@@ -1,10 +1,94 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getGoalSummary, createContribution } from "../api/api";
-import GoalProgressBar from "../components/GoalProgressBar";
-import "./GoalPage.css";
 import TopBar from "../components/TopBar";
+import "./GoalPage.css";
+import GoalStatsBar from "../components/GoalStatsBar";
+import ActivityFeed from "../components/ActivityFeed";
+import Leaderboard from "../components/Leaderboard";
+import ContributorList from "../components/ContributorList";
 
+//DONUT CHART
+function DonutChart({ raised, target }) {
+  const percent = Math.min((raised / target) * 100, 100);
+  const radius = 72;
+  const stroke = 14;
+  const normalised = radius - stroke / 2;
+  const circumference = 2 * Math.PI * normalised;
+  const filled = (percent / 100) * circumference;
+  const remaining = target - raised;
+
+  return (
+    <div className="donut-wrap">
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        {/* track */}
+        {percent < 100 && (
+          <circle
+            cx="80"
+            cy="80"
+            r={normalised}
+            fill="none"
+            stroke="#eeede8"
+            strokeWidth={stroke}
+          />
+        )}
+        {/* fill */}
+        <circle
+          cx="80"
+          cy="80"
+          r={normalised}
+          fill="none"
+          stroke="url(#donutGrad)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={
+            percent >= 100 ? `${circumference} 0` : `${filled} ${circumference}`
+          }
+          strokeDashoffset={circumference / 4}
+          style={{
+            transition: "stroke-dasharray 0.8s cubic-bezier(0.4,0,0.2,1)",
+          }}
+        />
+        <defs>
+          <linearGradient id="donutGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#97c459" />
+            <stop offset="100%" stopColor="#3b6d11" />
+          </linearGradient>
+        </defs>
+        {/* center text */}
+        <text
+          x="80"
+          y="72"
+          textAnchor="middle"
+          fontSize="22"
+          fontWeight="700"
+          fill="#2c2c2a"
+        >
+          {percent.toFixed(0)}%
+        </text>
+        <text x="80" y="92" textAnchor="middle" fontSize="10" fill="#888780">
+          FUNDED
+        </text>
+      </svg>
+      <div className="donut-legend">
+        <div className="donut-legend__item">
+          <span className="donut-legend__dot donut-legend__dot--raised" />
+          <span>
+            Raised <strong>Rs {raised.toLocaleString()}</strong>
+          </span>
+        </div>
+        <div className="donut-legend__item">
+          <span className="donut-legend__dot donut-legend__dot--remaining" />
+          <span>
+            Remaining <strong>Rs {remaining.toLocaleString()}</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+//MAIN PAGE
 export default function GoalPage() {
   const { goalId } = useParams();
   const navigate = useNavigate();
@@ -13,6 +97,7 @@ export default function GoalPage() {
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
+  const [contributing, setContributing] = useState(false);
 
   const user = JSON.parse(sessionStorage.getItem("selectedUser") || "null");
 
@@ -24,173 +109,164 @@ export default function GoalPage() {
   }, [user, navigate]);
 
   useEffect(() => {
-    async function fetchGoal() {
-      try {
-        const data = await getGoalSummary(goalId);
-        setGoal(data);
-      } catch (err) {
-        console.log(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
+    if (!user) return;
+    getGoalSummary(goalId)
+      .then(setGoal)
+      .catch((e) => console.error(e))
+      .finally(() => setLoading(false));
+  }, [user, goalId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    fetchGoal();
-  }, [goalId]);
+  if (!user) return null;
+  if (loading)
+    return (
+      <div className="goal-page">
+        <TopBar backTo="/goals" backLabel="Goals" />
+        <div className="goal-loading">Loading goal...</div>
+      </div>
+    );
+  if (!goal)
+    return (
+      <div className="goal-page">
+        <TopBar backTo="/goals" backLabel="Goals" />
+        <p>Goal not found.</p>
+      </div>
+    );
 
-  if (loading || !goal) return <p>Loading...</p>;
   const remaining = goal.target_amount - goal.total_raised;
-  const completed = goal.total_raised >= goal.target_amount;
+  const completed = goal.status === "completed";
+  const isOverdue =
+    goal.target_date && !completed && new Date(goal.target_date) < new Date();
+
+  const formatDate = (d) =>
+    new Date(d).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
 
   const handleContribute = async (e) => {
     e.preventDefault();
     setError("");
 
     const contribution = Number(amount);
-
     if (!contribution || contribution <= 0) {
       setError("Enter a valid amount");
       return;
     }
-
     if (contribution > remaining) {
-      setError("Contribution cannot exceed remaining target amount.");
+      setError(`Max contribution is Rs ${remaining}.`);
       return;
     }
 
-    await createContribution({
-      user_id: user.id,
-      goal_id: Number(goalId),
-      amount: contribution,
-    });
-
-    const updated = await getGoalSummary(goalId);
-    setGoal(updated);
-
-    setAmount("");
+    setContributing(true);
+    try {
+      await createContribution({
+        user_id: user.id,
+        goal_id: Number(goalId),
+        amount: contribution,
+      });
+      const updated = await getGoalSummary(goalId);
+      setGoal(updated);
+      setAmount("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setContributing(false);
+    }
   };
 
   return (
     <div className="goal-page">
       <TopBar backTo="/goals" backLabel="Goals" />
-      {/* HEADER CARD */}
-      <div className="goal-header-card">
-        <h1>{goal.title}</h1>
 
-        <p className="progress-text">{goal.percent_complete}% completed</p>
-
-        <GoalProgressBar
-          title={goal.title}
-          raised={goal.total_raised}
-          target={goal.target_amount}
-        />
-
-        {completed && <span className="badge-success">Goal Completed!</span>}
-      </div>
-
-      {/* STATS ROW */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <h3>Target</h3>
-          <p>Rs {goal.target_amount}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Raised</h3>
-          <p>Rs {goal.total_raised}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Remaining</h3>
-          <p>Rs {remaining}</p>
-        </div>
-      </div>
-
-      {/* MAIN GRID */}
-      <div className="goal-main-grid">
-        {/* LEFT SIDE */}
-        <div className="left-column">
-          {/* CONTRIBUTION FORM */}
-          <div className="goal-card">
-            <h2>Contribute</h2>
-
-            <form onSubmit={handleContribute}>
-              <input
-                type="number"
-                className="form-input"
-                placeholder="Enter amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-
-              {error && <p className="form-error">{error}</p>}
-
-              <button className="form-btn" type="submit">
-                Contribute
-              </button>
-            </form>
-          </div>
-
-          {/* LEADERBOARD */}
-          {goal.contributors?.length>0 &&( 
-          <div className="goal-card">
-            <div className="card-header">
-              <h2>Leaderboard</h2>
-              <span className="subtext">
-                {goal.contributors?.length || 0} contributors
+      {/* HERO BANNER */}
+      <div
+        className={`goal-hero ${isOverdue ? "goal-hero--overdue" : ""} ${completed ? "goal-hero--completed" : ""}`}
+      >
+        <div className="goal-hero__info">
+          <div className="goal-hero__title">{goal.title}</div>
+          <div className="goal-hero__meta">
+            {goal.created_by_name && (
+              <span>👤 Created by {goal.created_by_name}</span>
+            )}
+            {goal.target_date && (
+              <span className={isOverdue ? "overdue-text" : ""}>
+                📅 {isOverdue ? "Overdue · " : "Due "}
+                {formatDate(goal.target_date)}
               </span>
-            </div>
-
-            <div className="leaderboard">
-              {goal.contributors?.map((u, index) => (
-                <div key={u.id} className="leaderboard-row">
-                  <div className="rank-badge">#{index + 1}</div>
-
-                  <div className="leaderboard-info">
-                    <div className="name">{u.name}</div>
-                    <div className="meta">
-                      {u.num_contributions} contributions
-                    </div>
-                  </div>
-
-                  <div className="amount">Rs {u.total_contributed}</div>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
+          {completed && (
+            <div className="goal-hero__completed-badge"> Goal Completed!</div>
+          )}
+          {isOverdue && (
+            <div className="goal-hero__overdue-badge">⚠ Past target date</div>
           )}
         </div>
 
-        {/* RIGHT SIDE */}
-        {goal.recent_contributions?.length > 0 && (
-        <div className="right-column">
-          <div className="goal-card activity-card">
-            <div className="card-header">
-              <h2>Recent Activity</h2>
-              <span className="subtext">Live feed</span>
+        <GoalStatsBar goal={goal} />
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="goal-grid">
+        {/* LEFT COLUMN */}
+        <div className="goal-col">
+          {/* DONUT CHART */}
+          <div className="goal-card">
+            <div className="goal-card__head">
+              <h2>Funding Progress</h2>
             </div>
-
-            <div className="activity-list">
-              {goal.recent_contributions?.map((c) => (
-                <div key={c.id} className="activity-item">
-                  <div className="activity-dot" />
-
-                  <div className="activity-main">
-                    <div className="activity-text">
-                      <strong>{c.name}</strong> contributed
-                    </div>
-                    <div className="activity-time">
-                      {new Date(c.created_at).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="activity-amount">+Rs {c.amount}</div>
-                </div>
-              ))}
-            </div>
+            <DonutChart
+              raised={goal.total_raised}
+              target={goal.target_amount}
+            />
           </div>
+
+          {/* CONTRIBUTE FORM */}
+          {!completed && (
+            <div className="goal-card goal-card--contribute">
+              <div className="goal-card__head">
+                <h2>Make a Contribution</h2>
+                <span className="goal-card__sub">
+                  Rs {remaining.toLocaleString()} left
+                </span>
+              </div>
+              <form onSubmit={handleContribute} className="contrib-form">
+                <div className="contrib-input-wrap">
+                  <span className="contrib-input-prefix">Rs</span>
+                  <input
+                    type="number"
+                    className="contrib-input"
+                    placeholder="0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                {error && <p className="form-error">{error}</p>}
+                <button
+                  className="form-btn"
+                  type="submit"
+                  disabled={contributing}
+                >
+                  {contributing ? "Processing..." : "Contribute"}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
-        )}
+
+        {/* RIGHT COLUMN */}
+        <div className="goal-col">
+          <div className="goal-insights-grid">
+            <Leaderboard contributors={goal.contributors} />
+            <ContributorList
+              contributors={goal.contributors}
+              total={goal.total_raised}
+            />
+          </div>
+
+          <ActivityFeed contributions={goal.recent_contributions} />
+        </div>
       </div>
     </div>
   );
